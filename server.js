@@ -1,82 +1,90 @@
-const express = require("express");
-const fs = require("fs/promises");
+const express = require('express');
+const fs = require('fs').promises;
+const cors = require('cors');
 const app = express();
-const data_file = "ListData.json";
+const port = 3000;
+const DATA_FILE = './ListData.json';
 
-
-app.use(express.static("./Client"));
+// Middleware
+app.use(cors());
 app.use(express.json());
+app.use(express.static('client'));
 
-// Initialize empty array if file doesn't exist
-async function initializeDataFile() {
+// Utility functions to read/write data
+async function readData() {
   try {
-    await fs.access(data_file);
-  } catch {
-    await fs.writeFile(data_file, "[]");
+    const data = await fs.readFile(DATA_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    console.error('Error reading data:', err);
+    return [];
   }
 }
 
-
-app.get("/api", async (req, res) => {
-  await initializeDataFile();
+async function writeData(data) {
   try {
-    const data = await fs.readFile(data_file, "utf-8");
-    res.status(200).json(JSON.parse(data));
+    await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
   } catch (err) {
-    console.error("Failed to read or parse file:", err);
-    res.status(500).send("Error reading data");
+    console.error('Error writing data:', err);
   }
+}
+
+// Routes
+
+// GET - Retrieve all items
+app.get('/items', async (req, res) => {
+  const items = await readData();
+  res.json(items);
 });
 
-
-app.post("/api", async (req, res) => {
-  await initializeDataFile();
-  try {
-    const data = await fs.readFile(data_file, "utf-8");
-    const items = JSON.parse(data);
-    
-    items.push(req.body);
-    await fs.writeFile(data_file, JSON.stringify(items, null, 2));
-    res.status(200).send("Item added");
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error saving data");
+// POST - Add a new item
+app.post('/items', async (req, res) => {
+  const newItem = req.body.item;
+  if (!newItem) {
+    return res.status(400).json({ error: 'Item is required' });
   }
+
+  const items = await readData();
+  items.push(newItem);
+  await writeData(items);
+  res.status(201).json({ success: true, newItem });
 });
 
+// DELETE - Remove an item by ID (index)
+app.delete('/items/:id', async (req, res) => {
+  const itemId = parseInt(req.params.id);
+  const items = await readData();
 
-app.delete("/api/:index", async (req, res) => {
-  await initializeDataFile();
-  try { 
-    const index = Number(req.params.index);
-    const data = await fs.readFile(data_file, "utf-8");
-    const items = JSON.parse(data);
-    items.splice(index, 1);
-    await fs.writeFile(data_file, JSON.stringify(items, null, 2));
-    res.status(200).send("Item deleted")
-  } catch (err) {
-    console.error("Delete error:", err);
-    res.status(500).json({ error: "Error deleting item" });
+  if (itemId < 0 || itemId >= items.length) {
+    return res.status(404).json({ error: 'Item not found' });
   }
+
+  const removedItem = items.splice(itemId, 1);
+  await writeData(items);
+  res.json({ success: true, removedItem });
 });
 
-app.put("/api/:index", async (req, res) => {
-    const index = Number(req.params.index);
-    await initializeDataFile();
-    try {
-        const data = await fs.readFile(data_file, "utf-8");
-        const items = JSON.parse(data);
-        items[index].name = req.body.name.trim();
-        await fs.writeFile(data_file, JSON.stringify(items, null, 2));
-        res.status(200).send("Item updated")
-    } catch(err) {
-        console.error("Update error:", err);
-        res.status(500).json({ error: "Error updating item" });
-    }
+// PUT - Update an existing item by ID (index)
+app.put('/items/:id', async (req, res) => {
+  const itemId = parseInt(req.params.id);
+  const updatedItem = req.body.item;
+
+  if (!updatedItem) {
+    return res.status(400).json({ error: 'Updated item is required' });
+  }
+
+  const items = await readData();
+
+  if (itemId < 0 || itemId >= items.length) {
+    return res.status(404).json({ error: 'Item not found' });
+  }
+
+  items[itemId] = updatedItem;
+  await writeData(items);
+  res.status(200).json({ success: true, updatedItem });
 });
 
-// Start on port 5500
-const PORT = 5500;
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+// Start the server
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
 });
