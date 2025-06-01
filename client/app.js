@@ -1,108 +1,94 @@
-const http = new CoreHTTP();
-const itemList = document.getElementById('itemList');
-const addForm = document.getElementById('addForm');
-const itemInput = document.getElementById('itemInput');
-const message = document.getElementById('message');
+  document.addEventListener('DOMContentLoaded', () => {
+  const itemList = document.getElementById('item-list');
+  const addItemForm = document.getElementById('add-item-form');
+  const itemInput = document.getElementById('item-input');
+  const coreHTTP = new CoreHTTP();
 
-let items = [];
+  // Function to refresh the list from server
+  async function loadItems() {
+    try {
+      const items = await coreHTTP.get('/items');
+      itemList.innerHTML = '';
+      items.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.textContent = item;
 
-function showMessage(msg, isError = true) {
-  message.textContent = msg;
-  message.style.color = isError ? 'red' : 'green';
-  if (msg) setTimeout(() => { message.textContent = ''; }, 3000);
-}
-
-function renderList() {
-  itemList.innerHTML = '';
-  items.forEach((item, index) => {
-    const li = document.createElement('li');
-
-    const span = document.createElement('span');
-    span.textContent = item;
-    span.contentEditable = false;
-    span.classList.add('item-text');
-
-    const editBtn = document.createElement('button');
-    editBtn.textContent = 'Edit';
-    editBtn.classList.add('edit');
-    editBtn.addEventListener('click', () => toggleEdit(li, index));
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.textContent = 'Delete';
-    deleteBtn.classList.add('delete');
-    deleteBtn.addEventListener('click', () => deleteItem(index));
-
-    li.appendChild(span);
-    li.appendChild(editBtn);
-    li.appendChild(deleteBtn);
-
-    itemList.appendChild(li);
-  });
-}
-
-function toggleEdit(li, index) {
-  const span = li.querySelector('.item-text');
-  const editBtn = li.querySelector('.edit');
-
-  if (span.isContentEditable) {
-    // Save edit
-    const updatedText = span.textContent.trim();
-    if (!updatedText) {
-      showMessage('Item cannot be empty');
-      return;
-    }
-    http.put(`/items/${index}`, { item: updatedText })
-      .then(() => {
-        items[index] = updatedText;
-        span.contentEditable = false;
+        // Edit button
+        const editBtn = document.createElement('button');
         editBtn.textContent = 'Edit';
-        showMessage('Item updated', false);
-      })
-      .catch(() => showMessage('Failed to update item'));
-  } else {
-    // Enable edit
-    span.contentEditable = true;
-    span.focus();
-    editBtn.textContent = 'Save';
+        editBtn.onclick = () => editItem(index, item);
+
+        // Delete button
+        const delBtn = document.createElement('button');
+        delBtn.textContent = 'Delete';
+        delBtn.onclick = () => deleteItem(index);
+
+        li.appendChild(editBtn);
+        li.appendChild(delBtn);
+
+        itemList.appendChild(li);
+      });
+    } catch (err) {
+      alert('Error loading items: ' + err.message);
+    }
   }
-}
 
-function addItem(e) {
-  e.preventDefault();
-  const newItem = itemInput.value.trim();
-  if (!newItem) {
-    showMessage('Please enter an item');
-    return;
+  // Add new item
+  addItemForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const newItem = itemInput.value.trim();
+    if (!newItem) return alert('Please enter an item');
+    try {
+      await coreHTTP.post('/items', { item: newItem });
+      itemInput.value = '';
+      loadItems();
+    } catch (err) {
+      alert('Error adding item: ' + err.message);
+    }
+  });
+
+  // Delete item
+  async function deleteItem(id) {
+    if (!confirm('Are you sure you want to delete this item?')) return;
+    try {
+      await coreHTTP.delete(`/items/${id}`);
+      loadItems();
+    } catch (err) {
+      alert('Error deleting item: ' + err.message);
+    }
   }
-  http.post('/items', { item: newItem })
-    .then(() => {
-      items.push(newItem);
-      renderList();
-      addForm.reset();
-      showMessage('Item added', false);
-    })
-    .catch(() => showMessage('Failed to add item'));
-}
 
-function deleteItem(index) {
-  http.delete(`/items/${index}`)
-    .then(() => {
-      items.splice(index, 1);
-      renderList();
-      showMessage('Item deleted', false);
-    })
-    .catch(() => showMessage('Failed to delete item'));
-}
+  // Edit item inline
+  function editItem(id, oldValue) {
+    const li = itemList.children[id];
+    li.innerHTML = '';
 
-function loadItems() {
-  http.get('/items')
-    .then(data => {
-      items = data;
-      renderList();
-    })
-    .catch(() => showMessage('Failed to load items'));
-}
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = oldValue;
 
-addForm.addEventListener('submit', addItem);
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = 'Save';
+    saveBtn.onclick = async () => {
+      const updatedValue = input.value.trim();
+      if (!updatedValue) return alert('Item cannot be empty');
+      try {
+        await coreHTTP.put(`/items/${id}`, { item: updatedValue });
+        loadItems();
+      } catch (err) {
+        alert('Error updating item: ' + err.message);
+      }
+    };
 
-loadItems();
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.onclick = () => loadItems();
+
+    li.appendChild(input);
+    li.appendChild(saveBtn);
+    li.appendChild(cancelBtn);
+  }
+
+  // Initial load
+  loadItems();
+});
