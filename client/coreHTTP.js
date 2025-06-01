@@ -1,43 +1,36 @@
+// coreHTTP.js
 class CoreHTTP {
-  get(url) {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('GET', url);
-      xhr.onload = () => xhr.status === 200 ? resolve(JSON.parse(xhr.responseText)) : reject(xhr.status);
-      xhr.onerror = () => reject('Network error');
-      xhr.send();
-    });
+  async get(url) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('GET request failed: ' + response.statusText);
+    return response.json();
   }
 
-  post(url, data) {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', url);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.onload = () => xhr.status === 201 ? resolve(JSON.parse(xhr.responseText)) : reject(xhr.status);
-      xhr.onerror = () => reject('Network error');
-      xhr.send(JSON.stringify(data));
+  async post(url, data) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     });
+    if (!response.ok) throw new Error('POST request failed: ' + response.statusText);
+    return response.json();
   }
 
-  delete(url) {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('DELETE', url);
-      xhr.onload = () => xhr.status === 200 ? resolve(JSON.parse(xhr.responseText)) : reject(xhr.status);
-      xhr.onerror = () => reject('Network error');
-      xhr.send();
+  async put(url, data) {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     });
+    if (!response.ok) throw new Error('PUT request failed: ' + response.statusText);
+    return response.json();
   }
 
-  put(url, data) {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('PUT', url);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.onload = () => xhr.status === 200 ? resolve(JSON.parse(xhr.responseText)) : reject(xhr.status);
-      xhr.onerror = () => reject('Network error');
-      xhr.send(JSON.stringify(data));
+  async delete(url) {
+    const response = await fetch(url, {
+      method: 'DELETE',
     });
+    if (!response.ok) throw new Error('DELETE request failed: ' + response.statusText);
+    return response.json();
   }
 }
